@@ -1,0 +1,51 @@
+name: New Issue Opened
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  create_branch_and_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          # Create a branch name from issue number and title
+          BRANCH_NAME="issue-${ISSUE_NUMBER}-${ISSUE_TITLE// /-}"
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | cut -c1-60)
+          
+          # Create and checkout the new branch
+          git checkout -b "$BRANCH_NAME"
+          
+          # Create a placeholder file
+          echo "# Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}" > issue_${ISSUE_NUMBER}.md
+          echo "" >> issue_${ISSUE_NUMBER}.md
+          echo "This file is a placeholder for work related to issue #${ISSUE_NUMBER}." >> issue_${ISSUE_NUMBER}.md
+          
+          # Commit and push the new branch
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add issue_${ISSUE_NUMBER}.md
+          git commit -m "Create placeholder for issue #${ISSUE_NUMBER}"
+          git push -u origin "$BRANCH_NAME"
+          
+          # Create a pull request
+          PR_URL=$(gh pr create --title "WIP: ${ISSUE_TITLE}" --body "Resolves #${ISSUE_NUMBER}" --base main --head "$BRANCH_NAME")
+          echo "Pull request created: $PR_URL"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_URL: ${{ steps.create_pr.outputs.pr_url }}
+        run: |
+          gh issue comment $ISSUE_NUMBER --body "A branch and pull request have been automatically created for this issue. You can find the pull request here: $PR_URL"
