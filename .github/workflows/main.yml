@@ -11,9 +11,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Create branch
+      - name: Create branch and PR
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
@@ -38,12 +38,13 @@ jobs:
           
           # Create a pull request
           PR_URL=$(gh pr create --title "WIP: ${ISSUE_TITLE}" --body "Resolves #${ISSUE_NUMBER}" --base main --head "$BRANCH_NAME")
+          echo "PR_URL=$PR_URL" >> $GITHUB_OUTPUT
           echo "Pull request created: $PR_URL"
-          
+
       - name: Comment on issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          PR_URL: ${{ steps.create_pr.outputs.pr_url }}
         run: |
+          PR_URL="${{ steps.create_branch_and_pr.outputs.PR_URL }}"
           gh issue comment $ISSUE_NUMBER --body "A branch and pull request have been automatically created for this issue. You can find the pull request here: $PR_URL"
