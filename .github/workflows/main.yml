@@ -11,31 +11,40 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Create branch name
-        id: create_branch_name
+      - name: Create branch and PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
-          BRANCH_NAME="issue-${{ github.event.issue.number }}-${{ github.event.issue.title }}"
+          # Create a branch name from issue number and title
+          BRANCH_NAME="issue-${ISSUE_NUMBER}-${ISSUE_TITLE// /-}"
           BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | cut -c1-60)
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create and push branch
-        run: |
+          
+          # Create and checkout the new branch
+          git checkout -b "$BRANCH_NAME"
+          
+          # Create a placeholder file
+          echo "# Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}" > issue_${ISSUE_NUMBER}.md
+          echo "" >> issue_${ISSUE_NUMBER}.md
+          echo "This file is a placeholder for work related to issue #${ISSUE_NUMBER}." >> issue_${ISSUE_NUMBER}.md
+          
+          # Commit and push the new branch
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git checkout -b ${{ steps.create_branch_name.outputs.branch_name }}
-          echo "# Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}" > issue_${{ github.event.issue.number }}.md
-          echo "" >> issue_${{ github.event.issue.number }}.md
-          echo "This file is a placeholder for work related to issue #${{ github.event.issue.number }}." >> issue_${{ github.event.issue.number }}.md
-          git add issue_${{ github.event.issue.number }}.md
-          git commit -m "Create placeholder for issue #${{ github.event.issue.number }}"
-          git push -u origin ${{ steps.create_branch_name.outputs.branch_name }}
-
-      - name: Create pull request
-        id: create_pr
-        run: |
-          PR_URL=$(gh pr create --title "WIP: ${{ github.event.issue.title }}" --body "Resolves #${{ github.event.issue.number }}" --base main --head ${{ steps.create_branch_name.outputs.branch_name }})
-          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          git add issue_${ISSUE_NUMBER}.md
+          git commit -m "Create placeholder for issue #${ISSUE_NUMBER}"
+          git push -u origin "$BRANCH_NAME"
+          
+          # Create a pull request
+          PR_URL=$(gh pr create --title "WIP: ${ISSUE_TITLE}" --body "Resolves #${ISSUE_NUMBER}" --base main --head "$BRANCH_NAME")
+          echo "PR_URL=$PR_URL" >> $GITHUB_OUTPUT
+          echo "Pull request created: $PR_URL"
 
       - name: Comment on issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          gh issue comment ${{ github.event.issue.number }} --body "A branch and pull request have been automatically created for this issue. You can find the pull request here: ${{ steps.create_pr.outputs.pr_url }}"
+          PR_URL="${{ steps.create_branch_and_pr.outputs.PR_URL }}"
+          gh issue comment $ISSUE_NUMBER --body "A branch and pull request have been automatically created for this issue. You can find the pull request here: $PR_URL"
