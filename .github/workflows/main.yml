@@ -39,9 +39,7 @@ jobs:
           # Create a pull request
           PR_URL=$(gh pr create --title "WIP: ${ISSUE_TITLE}" --body "Resolves #${ISSUE_NUMBER}" --base main --head "$BRANCH_NAME")
           echo "Pull request created: $PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          
       - name: Comment on issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
