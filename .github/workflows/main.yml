@@ -9,24 +9,28 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
       issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: Create branch and PR
+      - name: Create branch and file
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
+          # Fetch the latest changes
+          git fetch origin
+
           # Create a branch name from issue number and title
           BRANCH_NAME="issue-${ISSUE_NUMBER}-${ISSUE_TITLE// /-}"
           BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | cut -c1-60)
           
           # Create and checkout the new branch
-          git checkout -b "$BRANCH_NAME"
+          git checkout -b "$BRANCH_NAME" origin/main
           
           # Create a placeholder file
           echo "# Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}" > issue_${ISSUE_NUMBER}.md
@@ -40,15 +44,23 @@ jobs:
           git commit -m "Create placeholder for issue #${ISSUE_NUMBER}"
           git push -u origin "$BRANCH_NAME"
           
-          # Create a pull request
+          # Save branch name for next step
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          BRANCH_NAME="${{ steps.create_branch_and_file.outputs.BRANCH_NAME }}"
           PR_URL=$(gh pr create --title "WIP: ${ISSUE_TITLE}" --body "Resolves #${ISSUE_NUMBER}" --base main --head "$BRANCH_NAME")
           echo "PR_URL=$PR_URL" >> $GITHUB_OUTPUT
-          echo "Pull request created: $PR_URL"
 
       - name: Comment on issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          PR_URL="${{ steps.create_branch_and_pr.outputs.PR_URL }}"
+          PR_URL="${{ steps.create_pull_request.outputs.PR_URL }}"
           gh issue comment $ISSUE_NUMBER --body "A branch and pull request have been automatically created for this issue. You can find the pull request here: $PR_URL"
