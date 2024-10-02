@@ -32,14 +32,10 @@ jobs:
 
       - name: Create pull request
         id: create_pr
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_URL=$(gh pr create --title "WIP: ${{ github.event.issue.title }}" --body "Resolves #${{ github.event.issue.number }}" --base main --head ${{ steps.create_branch_name.outputs.branch_name }})
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
 
       - name: Comment on issue
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ github.event.issue.number }} --body "A branch and pull request have been automatically created for this issue. You can find the pull request here: ${{ steps.create_pr.outputs.pr_url }}"
